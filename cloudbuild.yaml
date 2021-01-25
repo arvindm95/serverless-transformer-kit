@@ -1,0 +1,23 @@
+steps:
+  # for gradle project
+  - name: 'gcr.io/cloud-builders/gradle'
+    args: ['build', '-x', 'test']
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/service:$SHORT_SHA', '.']
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/service:$SHORT_SHA']
+  # Deploy container image to Cloud Run
+  # Setup terraform image in cloud build
+  - name: 'gcr.io/cloud-builders/git'
+    args: ['clone', 'https://github.com/GoogleCloudPlatform/cloud-builders-community']
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['builds', 'submit', '--config', './cloud-builders-community/terraform/cloudbuild.yaml','./cloud-builders-community/terraform/']
+  # Terraform to create infra/deploy latest changes on app code.  
+  - name: 'gcr.io/${PROJECT_ID}/terraform'
+    args: ['init', './infra/']
+  - name: 'gcr.io/${PROJECT_ID}/terraform'
+    args: ['apply', '-var', 'project_id=$PROJECT_ID', '-var', 'app_version=$SHORT_SHA', '-auto-approve', './infra/']
+images:
+  - gcr.io/$PROJECT_ID/service:$SHORT_SHA
